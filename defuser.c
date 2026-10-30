@@ -202,8 +202,6 @@ int solve_phase_5(uint64_t challenge, char *out, size_t cap) {
 }
 
 
-
-/* Phase 6: 恢复六种运算函数 */
 static uint32_t p6_apply(uint32_t op, uint32_t x) {
     switch (op) {
         case 0:
@@ -213,7 +211,6 @@ static uint32_t p6_apply(uint32_t op, uint32_t x) {
             return (8u * x + 0xa8cau) ^ (7u * x);
 
         case 2:
-            // 循环右移 7 位
             return (x >> 7) | (x << 25);
 
         case 3:
@@ -223,7 +220,6 @@ static uint32_t p6_apply(uint32_t op, uint32_t x) {
             return (x + 0xf547u) ^ (x >> 5);
 
         case 5:
-            // 循环左移 1 位
             return ((x << 1) | (x >> 31)) ^ 0x3c41u;
 
         default:
@@ -258,12 +254,38 @@ int solve_phase_6(uint64_t challenge, char *out, size_t cap) {
 }
 
 
-int solve_secret(uint64_t challenge, uint64_t context, char *out, size_t cap) {
-    (void)challenge;
-    (void)context;
-    (void)out;
-    (void)cap;
-    // TODO（选做）: 根据 secret_gate、secret_copy 和 secret_phase 的汇编构造完整的第七行，写入 out 后返回 0。
-    // 第七行不一定只有整数，可以直接用 snprintf 写入；还没完成时保持返回 1，测试会显示 not attempted。
-    return 1;
+
+int solve_secret(uint64_t challenge, uint64_t context,
+                 char *out, size_t cap) {
+
+    uint32_t x = (uint32_t)challenge
+               ^ (uint32_t)(challenge >> 32);
+
+    uint32_t y = (uint32_t)context
+               ^ (uint32_t)(context >> 32);
+
+    uint32_t a = (uint32_t)context & 3u;
+
+    uint32_t arg = x ^ y;
+    uint32_t mixed = (3u * arg + 0x393fu) ^ 0x8435u;
+
+    uint32_t salt = (0x393fu * a)
+                  ^ (uint32_t)(context >> 16);
+
+    uint32_t b = mixed ^ salt;
+
+    uint32_t c = b ^ (y + a + 0x8435u + (x >> 7));
+
+    const char *prefix = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOPEN";
+
+    int n = snprintf(out, cap,
+                     "%s%" PRIu32 " %" PRIu32 " %" PRIu32,
+                     prefix, a, b, c);
+
+    if (n < 0 || (size_t)n >= cap) {
+        return 1;
+    }
+
+    return 0;
 }
+
